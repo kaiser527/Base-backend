@@ -9,14 +9,22 @@ import {
   Body,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { Public, ResponseMessage, User } from 'src/decorator/customize';
+import {
+  Public,
+  ResponseMessage,
+  skipPermission,
+  User,
+} from 'src/decorator/customize';
 import { LocalAuthGuard } from './local-auth.guard';
 import { Request as ExpressRequest, Response } from 'express';
 import { IUser } from 'src/users/users.interface';
-import { RegisterUserDto } from 'src/users/dto/create-user.dto';
+import { RegisterUserDto, UserLoginDto } from 'src/users/dto/create-user.dto';
 import { RolesService } from 'src/roles/roles.service';
 import { IPermission } from 'src/permissions/permissions.interface';
+import { ThrottlerGuard } from '@nestjs/throttler';
+import { ApiBody, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -25,6 +33,8 @@ export class AuthController {
   ) {}
 
   @Public()
+  @ApiBody({ type: UserLoginDto })
+  @UseGuards(ThrottlerGuard)
   @UseGuards(LocalAuthGuard)
   @ResponseMessage('User ogin')
   @Post('/login')
@@ -33,12 +43,14 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(ThrottlerGuard)
   @Post('/register')
   @ResponseMessage('User Register')
   register(@Body() registerUserDto: RegisterUserDto) {
     return this.authService.register(registerUserDto);
   }
 
+  @skipPermission()
   @Get('/account')
   @ResponseMessage('Get user info')
   async getAccount(@User() user: IUser) {
@@ -57,7 +69,8 @@ export class AuthController {
     return { user };
   }
 
-  @Get('/refresh')
+  @skipPermission()
+  @UseGuards(ThrottlerGuard)
   @ResponseMessage('Get user by refresh token')
   handleRefreshToken(
     @Req() request: ExpressRequest,
